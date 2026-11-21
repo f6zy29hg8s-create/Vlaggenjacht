@@ -1,0 +1,9 @@
+{
+  "name": "Vlaggenjacht",
+  "short_name": "Vlaggenjacht",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff6e5",
+  "theme_color": "#ffc43d",
+  "icons": [{ "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }]
+}

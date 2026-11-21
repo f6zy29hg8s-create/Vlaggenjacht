@@ -4,9 +4,11 @@
 <meta charset="utf-8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Vlaggenjacht">
+<meta name="theme-color" content="#ffc43d">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Vlaggenjacht</title>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#fff6e5;--ink:#2b2350;--muted:#6b6490;--card:#fff;--sun:#ffc43d;--coral:#ff6b6b;--mint:#2ec4a6;--sky:#4d96ff;--grape:#9b5de5;--good:#22b573;--bad:#ef4b4b;--sea:#cfe8ff}
@@ -90,7 +92,17 @@
   .next{background:var(--sun);border-radius:22px;padding:14px 26px;font-size:24px;font-weight:700;box-shadow:0 5px 0 #d9a22a;margin-top:10px}
   .next:active{transform:translateY(4px);box-shadow:0 1px 0 #d9a22a}
   .mapbox{background:var(--sea);border-radius:22px;overflow:hidden;box-shadow:0 6px 0 #b6d4f0;position:relative}
-  .mapbox svg{display:block;width:100%;height:auto}
+  .mapbox svg{display:block;width:100%;height:100%;touch-action:none}
+  .wrap.wide{max-width:1100px}
+  .wrap.wide .screen>*+*{margin-top:10px}
+  .zoom{position:absolute;right:10px;bottom:10px}
+  .wrap.wide .feedback{position:fixed;left:0;right:0;bottom:18px;min-height:0;z-index:5;pointer-events:none;font-size:20px}
+  .wrap.wide .feedback:empty{display:none}
+  .wrap.wide .feedback>*{pointer-events:auto}
+  .wrap.wide .feedback div{display:inline-block;background:#fff;padding:8px 16px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+  .wrap.wide .feedback .next{display:block;margin:10px auto 0}
+  .zoom button{display:block;width:48px;height:48px;margin-top:8px;border-radius:14px;background:#fff;font-size:26px;font-weight:700;box-shadow:0 3px 0 #b6d4f0}
+  .zoom button:active{transform:translateY(2px);box-shadow:0 1px 0 #b6d4f0}
   .land{fill:#e9e4da;stroke:#fff;stroke-linejoin:round}
   .land.play{fill:#ffe08a;cursor:pointer}
   .land.right{fill:#57d39b}
@@ -98,7 +110,7 @@
   .land.flash{animation:flash 1s 2}
   @keyframes flash{50%{fill:#57d39b}}
   .pin{pointer-events:none}
-  .maphint{font-size:16px;color:var(--muted);text-align:center;margin-top:8px}
+  .maphint{font-size:15px;color:var(--muted);text-align:center;margin:6px 0 0}
   .end{background:var(--card);border-radius:28px;padding:26px 18px;box-shadow:0 6px 0 #e8dcc4;text-align:center;margin-top:20px}
   .end>*+*{margin-top:14px}
   .end .trophy{font-size:84px;animation:bounce 1s infinite}
@@ -247,7 +259,7 @@ var PRAISE=['Goed zo!','Super!','Knap hoor!','Top!'];
 /* ---------- Schermen ---------- */
 function show(id){ var s=document.querySelectorAll('.screen'); for(var i=0;i<s.length;i++) s[i].className = 'screen'+(s[i].id==='s-'+id?' on':''); window.scrollTo(0,0); }
 var homes=document.querySelectorAll('[data-home]');
-for(var hi=0;hi<homes.length;hi++) homes[hi].onclick=function(){ stopSay(); renderHome(); show('home'); };
+for(var hi=0;hi<homes.length;hi++) homes[hi].onclick=function(){ stopSay(); document.querySelector('.wrap').className='wrap'; renderHome(); show('home'); };
 
 function renderHome(){
   var hero=$('#heroFlags'); hero.innerHTML='';
@@ -301,8 +313,10 @@ function startQuiz(){
   queue = shuffle(P).slice(0,ROUND);
   qi=0; stars=0; results=[]; missed=[];
   show('quiz');
-  if(mode==='map') buildMap();
+  document.querySelector('.wrap').className='wrap'+(mode==='map'?' wide':'');
+  if(mode==='map') buildMap(); else box=null;
   nextQuestion();
+  if(mode==='map') sizeMap();
 }
 function renderDots(){
   var d=$('#dots'); d.innerHTML='';
@@ -361,7 +375,7 @@ function answer(code, btn, group){
     if(btn){ btn.className+=' ok'; all.forEach(function(b){ if(b!==btn) b.className+=' dim'; }); burst(btn); }
     stars++; results[qi]=true; ding();
     var p=PRAISE[Math.floor(Math.random()*PRAISE.length)];
-    $('#feedback').textContent='⭐ '+p;
+    $('#feedback').innerHTML='<div>⭐ '+p+'</div>';
     say(p, current.name);
     renderDots();
     setTimeout(advance, 1800);
@@ -385,11 +399,12 @@ function advance(){ qi++; if(qi<ROUND){ nextQuestion(); if(mode!=='map') window.
 
 /* ---------- Kaart ---------- */
 var SVGNS='http://www.w3.org/2000/svg', svg=null, vb=null;
+var box=null, base=null, cur=null, moved=false, tch=null;
 function buildMap(){
   var o=$('#options'); o.innerHTML='';
   vb = MAP.views[cont];
-  var box=document.createElement('div'); box.className='mapbox';
-  svg=document.createElementNS(SVGNS,'svg'); svg.setAttribute('viewBox', vb.join(' '));
+  box=document.createElement('div'); box.className='mapbox';
+  svg=document.createElementNS(SVGNS,'svg'); svg.setAttribute('viewBox', vb.join(' ')); svg.setAttribute('preserveAspectRatio','xMidYMid meet');
   var sw = vb[2]/400;
   var codes = {}; P.forEach(function(c){ codes[c.code]=1; });
   MAP.shapes.forEach(function(s){
@@ -398,10 +413,70 @@ function buildMap(){
     if(s[0]) p.setAttribute('data-c', s[0]);
     svg.appendChild(p);
   });
-  svg.addEventListener('click', mapClick);
-  box.appendChild(svg); o.appendChild(box);
-  var h=document.createElement('p'); h.className='maphint'; h.textContent='Tik op het goede land. De gele landen doen mee.'; o.appendChild(h);
+  svg.addEventListener('click', function(e){ if(moved){ moved=false; return; } mapClick(e); });
+  svg.addEventListener('touchstart', tStart, false);
+  svg.addEventListener('touchmove', tMove, false);
+  svg.addEventListener('touchend', function(e){ if(e.touches.length===0) tch=null; }, false);
+  var md=null;
+  svg.addEventListener('mousedown', function(e){ md={x:e.clientX,y:e.clientY,c:cur.slice()}; moved=false; });
+  window.addEventListener('mousemove', function(e){ if(!md) return; var dx=e.clientX-md.x, dy=e.clientY-md.y; if(Math.abs(dx)+Math.abs(dy)>8) moved=true; if(moved) pan(md.c,dx,dy); });
+  window.addEventListener('mouseup', function(){ md=null; });
+  box.appendChild(svg);
+  var z=document.createElement('div'); z.className='zoom';
+  [['＋',function(){ zoomBy(1.6); }],['－',function(){ zoomBy(1/1.6); }],['⤢',function(){ cur=base.slice(); applyView(); }]].forEach(function(b){
+    var btn=document.createElement('button'); btn.textContent=b[0]; btn.onclick=function(e){ e.stopPropagation(); b[1](); }; z.appendChild(btn); });
+  box.appendChild(z);
+  o.appendChild(box);
+  var h=document.createElement('p'); h.className='maphint'; h.textContent='Tik op het goede land. Inzoomen kan met + of met twee vingers.'; o.appendChild(h);
 }
+function sizeMap(){
+  if(!box) return;
+  var top=box.getBoundingClientRect().top + (window.pageYOffset||0);
+  var hgt=Math.max(260, (window.innerHeight||600) - top - 46);
+  box.style.height=hgt+'px';
+  var bw=box.clientWidth, bh=box.clientHeight, v=MAP.views[cont].slice(), ar=bw/bh;
+  if(v[2]/v[3] > ar){ var nh=v[2]/ar; v[1]-=(nh-v[3])/2; v[3]=nh; } else { var nw=v[3]*ar; v[0]-=(nw-v[2])/2; v[2]=nw; }
+  base=v; cur=v.slice(); applyView();
+  if(ar<1) zoomBy(1.12);
+}
+function applyView(){
+  var minW=base[2]/8;
+  if(cur[2]>base[2]){ cur=base.slice(); }
+  if(cur[2]<minW){ var f=minW/cur[2]; cur[0]-=(cur[2]*f-cur[2])/2; cur[1]-=(cur[3]*f-cur[3])/2; cur[2]*=f; cur[3]*=f; }
+  cur[0]=Math.max(base[0], Math.min(cur[0], base[0]+base[2]-cur[2]));
+  cur[1]=Math.max(base[1], Math.min(cur[1], base[1]+base[3]-cur[3]));
+  svg.setAttribute('viewBox', cur.join(' '));
+}
+function zoomBy(f, cx, cy, from){
+  var c=from||cur; if(cx==null){ cx=c[0]+c[2]/2; cy=c[1]+c[3]/2; }
+  var nw=c[2]/f, nh=c[3]/f;
+  cur=[cx-(cx-c[0])*(nw/c[2]), cy-(cy-c[1])*(nh/c[3]), nw, nh];
+  applyView();
+}
+function pan(from,dx,dy){ var k=from[2]/box.clientWidth; cur=[from[0]-dx*k, from[1]-dy*k, from[2], from[3]]; applyView(); }
+function toSvg(x,y){ var pt=svg.createSVGPoint(); pt.x=x; pt.y=y; var m=svg.getScreenCTM(); return m?pt.matrixTransform(m.inverse()):{x:0,y:0}; }
+function tStart(e){
+  if(e.touches.length===1){ tch={x:e.touches[0].clientX, y:e.touches[0].clientY, c:cur.slice()}; moved=false; }
+  else if(e.touches.length===2){
+    var a=e.touches[0], b=e.touches[1];
+    var mid=toSvg((a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2);
+    tch={pinch:true, d:Math.sqrt(Math.pow(a.clientX-b.clientX,2)+Math.pow(a.clientY-b.clientY,2)), c:cur.slice(), mx:mid.x, my:mid.y};
+    moved=true;
+  }
+}
+function tMove(e){
+  if(!tch) return;
+  if(tch.pinch && e.touches.length===2){
+    e.preventDefault();
+    var a=e.touches[0], b=e.touches[1], d=Math.sqrt(Math.pow(a.clientX-b.clientX,2)+Math.pow(a.clientY-b.clientY,2));
+    zoomBy(d/tch.d, tch.mx, tch.my, tch.c);
+  } else if(!tch.pinch && e.touches.length===1){
+    var dx=e.touches[0].clientX-tch.x, dy=e.touches[0].clientY-tch.y;
+    if(Math.abs(dx)+Math.abs(dy)>10) moved=true;
+    if(moved && cur[2]<base[2]*0.999){ e.preventDefault(); pan(tch.c,dx,dy); }
+  }
+}
+window.addEventListener('resize', function(){ if(mode==='map' && box && document.getElementById('s-quiz').className.indexOf('on')>-1) sizeMap(); });
 function landEl(code){ return svg.querySelector('path[data-c="'+code+'"]'); }
 function mapClick(e){
   if(locked) return;
@@ -409,11 +484,10 @@ function mapClick(e){
   var inPool = code && P.some(function(c){ return c.code===code; });
   if(!inPool){
     // klein land gemist? kies het dichtstbijzijnde meedoende land
-    var pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
-    var m=svg.getScreenCTM(); if(!m) return; var sp=pt.matrixTransform(m.inverse());
+    var sp=toSvg(e.clientX,e.clientY);
     var best=null, bd=1e9;
     P.forEach(function(c){ var ce=MAP.cent[c.code]; var d=Math.sqrt(Math.pow(ce[0]-sp.x,2)+Math.pow(ce[1]-sp.y,2)); if(d<bd){ bd=d; best=c.code; } });
-    if(bd < vb[2]*0.05) code=best; else return;
+    if(bd < cur[2]*0.06) code=best; else return;
   }
   var el=landEl(code);
   if(code===current.code){
@@ -474,6 +548,12 @@ function confetti(n){
 }
 document.addEventListener('touchstart',function(){},true);
 renderHome();
+/* Offline spelen: alleen op de eigen website (niet binnen Claude) */
+try{
+  if('serviceWorker' in navigator && location.protocol==='https:' && location.hostname.indexOf('github.io')>-1){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+}catch(e){}
 </script>
 </body>
 </html>
