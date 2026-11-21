@@ -1,5 +1,5 @@
 // Vlaggenjacht: bewaart het spel op het apparaat zodat het ook offline werkt.
-var CACHE = 'vlaggenjacht-v3';
+var CACHE = 'vlaggenjacht-v4';
 var FILES = ['./', './index.html', './apple-touch-icon.png', './manifest.json'];
 
 self.addEventListener('install', function (e) {
